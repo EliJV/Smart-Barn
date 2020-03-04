@@ -1,13 +1,21 @@
+import re
 import serial
 import serial.tools.list_ports as port_list
 
+a=-1
+
 #Finds and prints ports
 ports = list(port_list.comports())
-print (ports)
+#Dynamically grabs port
 for p in ports:
-    print (p)
+    for comms in p:
+        a=a+1
+        if comms.startswith('JLink'):
+            comport=p[a-1]
 
-serialPort = serial.Serial(port = "COM17", baudrate=115200,
+#Todo grab port dynamically using regex
+port= comport
+serialPort = serial.Serial(port, baudrate=115200,
                            bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
 
 serialString = ""                           # Used to hold data coming over UART
