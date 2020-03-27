@@ -1,3 +1,4 @@
+import time
 import re
 import json
 import serial
@@ -10,14 +11,18 @@ a=-1
 #Finds and prints ports
 ports = list(port_list.comports())
 
+#Python changes made it unable to grab dynamically
 #Dynamically grabs port
-for p in ports:
-    for comms in p:
-        a = a + 1
-        if comms.startswith('JLink'):
-            comport = p[a-1]
+#for p in ports:
+#    for comms in p:
+#        for x in p:
+#            a=a+1
+#            if x.endswith('CDC'):
+#                print (p[a-1])
+#                comport = p[a-1]//
 
 #Sets port information
+comport = '/dev/ttyACM7'
 print (comport)
 port = comport
 serialPort = serial.Serial(port, baudrate=115200,
@@ -28,7 +33,7 @@ serialString = ""                           # Used to hold data coming over UART
 def waterlevel(data):
     if data.startswith('<info> app: WL data:'):
             waterout = int(data[20:])
-            percentfull = (waterout/255)
+            percentfull = ((waterout)/177)
             gallons = (5.5*percentfull)
             return gallons
 
@@ -38,7 +43,7 @@ while(1):
         #Opens a text file to append to
         text_file=open("UARTData.txt","a+")
 
-        # Read data out of the buffer until a carraige return / new line is found
+        # Read data out of the buffer until a carraige return / new 		line is found
         serialString = serialPort.readline()
         message=(serialString.decode('Ascii'))
 
@@ -52,15 +57,12 @@ while(1):
         gallons = waterlevel(message)
         print('Gallons in Bucket:' + str(gallons))
 
-        # Tell the device connected over the serial port that we recevied the data!
-        # The b at the beginning is used to indicate bytes!
-        serialPort.write(b"Thank you for sending data \r\n")
-
-        #Send information to the cloud
-        hologram = HologramCloud(dict(), network'cellular')
+	#Send information to the cloud
+        hologram = HologramCloud(dict(), network='cellular')
         print('Cloud type: ' + str(hologram))
         payload = {"WaterLevel":gallons}
-        recv =hologram.sendMessage(json.dumps(payload)
+        recv =hologram.sendMessage(json.dumps(payload))
 
         # Closes txt file
         text_file.close()
+        time.sleep(30)
