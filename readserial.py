@@ -1,3 +1,4 @@
+import sys
 import time
 import re
 import json
@@ -7,37 +8,20 @@ from Hologram.HologramCloud import HologramCloud
 
 ports = list(port_list.comports())
 
+uplimit = 0
+lowlimit = 0
+
 #Python changes made it unable to grab dynamically
 #Dynamically grabs port
 for p in ports:
     print (p)
 
+
 #Sets port information
-comport = '/dev/ttyACM7'
+comport = '/dev/ttyACM0'
 print ("Using: " + comport)
 serialPort = serial.Serial(comport, baudrate=115200,
-                           bytesize=8, timeout=2, stopbits=serial.STOPBITS_ONE)
-
-# Used to hold data coming over UART
-serialString = ""
-
-def waterlevel(data):
-    if data.startswith('<info> app: WL data:'):
-        waterdata = int(data[20:])
-    if data.starts('<info> app: WL cal:'):
-        x = re.split(',|\.',data)
-        upperlimit, lowerlimit = x
-        upperlimitd = re.findall(r'\d+', upperlimit)
-        lowerlimitd = re.findall(r'\d+', lowerlimit)
-        uplimit = (int(upperlimitd[0]))
-        lowlimit = (int(lowerlimitd[0]))
-        print (uplimit)
-        print (lowlimit)
-        adjustdata = (waterdata - lowlimit)
-        datarange = (uplimit - lowlimit)
-        percentfull = (adjustdata/datarange)
-        gallons = percentfull*5.5
-        return gallons
+                           bytesize=8, timeout=3, stopbits=serial.STOPBITS_ONE)
 
 while(1):
     # Wait until there is data waiting in the serial buffer
@@ -45,14 +29,65 @@ while(1):
         # Read data out of the buffer until a carraige return / new line is found
         serialString = serialPort.readline()
         message=(serialString.decode('Ascii'))
+        percentfull = 0
+        sensor = ""
+        #print(message)
+        msgTemp  = message.split(':')
+        try:
+            sensor = msgTemp[1]
+        except:
+            print("No sensor data detected: %s", message)
 
-        # Print the contents of the serial data
-        print(message)
 
-        #Water logic if connected
-        gallons = waterlevel(message)
-        print('Gallons in Bucket:' + str(gallons))
-
-        #Send information to the cloud
-        hologram = HologramCloud(dict(), network='cellular')
-        print('Cloud type: ' + str(hologram))
+        if "WL" in sensor:
+            if "cal" in sensor:
+                lo, hi = msgTemp[2].split(',')
+                lowlimit = int(lo.strip())
+                uplimit = int(hi.strip())
+                print("WL Cal values recieved: ", lowlimit, uplimit)
+            else:
+                try:
+                    print(msgTemp[2])
+                    level = int(msgTemp[2]) - lowlimit if  \
+                            int(msgTemp[2])- lowlimit > 0 else 0 #avoid problems with bad cal
+                    gallons = 5.5 * (level / (uplimit - lowlimit))
+                    msg = {"WaterLevel":gallons}
+                    print(msg)
+                    hologram = HologramCloud(dict(), network='cellular')
+                    recv = hologram.sendMessage(json.dumps(msg), timeout=3)
+                    print(hologram.getResultString(recv))
+                except:
+                    print("Error sending msg: ", msg)
+                    try:
+                        print("Hologram msg: ", recv)
+                    except:
+                        print("Holoram msg error: ", sys.exc_info()[0])
+                    print("Error info: ", sys.exc_info()[0])
+        elif "DS" in sensor:
+            try:
+                msg = {"DoorAlarm": msgTemp[2].strip()}
+                print(msg)
+                hologram = HologramCloud(dict(), network='cellular')
+                recv = hologram.sendMessage(json.dumps(msg), timeout=3)
+                print(hologram.getResultString(recv))
+            except:
+                print("Error sending msg: ", msg)
+                try:
+                    print("Hologram msg: ", recv)
+                except:
+                    print("Holoram msg error: ", sys.exc_info()[0])
+                print("Error info: ", sys.exc_info()[0])
+        elif "FA" in sensor:
+            try:
+                msg = {"FireAlarm": msgTemp[2].strip()}
+                print(msg)
+                hologram = HologramCloud(dict(), network='cellular')
+                recv = hologram.sendMessage(json.dumps(msg), timeout=3)
+                print(hologram.getResultString(recv))
+            except:
+                print("Error sending msg: ", msg)
+                try:
+                    print("Hologram msg: ", recv)
+                except:
+                    print("Holoram msg error: ", sys.exc_info()[0])
+                print("Error info: ", sys.exc_info()[0])
